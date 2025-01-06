@@ -17,7 +17,7 @@ import (
 )
 
 var masterAddr *string = flag.String("maddr", "", "Master address. Defaults to localhost")
-var masterPort *int = flag.Int("mport", 7087, "Master port.  Defaults to 7077.")
+var masterPort *int = flag.Int("mport", 7087, "Master port.  Defaults to 7087.")
 var reqsNb *int = flag.Int("q", 5000, "Total number of requests. Defaults to 5000.")
 var writes *int = flag.Int("w", 100, "Percentage of updates (writes). Defaults to 100%.")
 var noLeader *bool = flag.Bool("e", false, "Egalitarian (no leader). Defaults to false.")
@@ -29,12 +29,10 @@ var eps *int = flag.Int("eps", 0, "Send eps more messages per round than the cli
 var conflicts *int = flag.Int("c", -1, "Percentage of conflicts. Defaults to 0%")
 var s = flag.Float64("s", 2, "Zipfian s parameter")
 var v = flag.Float64("v", 1, "Zipfian v parameter")
-var T = flag.Int("T", 1, "Number of threads (simulated clients).")
 
 var N int
 
 var successful []int
-var latency []int64
 
 var rarray []int
 var rsp []bool
@@ -55,6 +53,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error connecting to master\n")
 	}
+	log.Printf("Connected to master\n")
 
 	rlReply := new(masterproto.GetReplicaListReply)
 	err = master.Call("Master.GetReplicaList", new(masterproto.GetReplicaListArgs), rlReply)
@@ -110,12 +109,12 @@ func main() {
 		if err != nil {
 			log.Printf("Error connecting to replica %d\n", i)
 		}
+		log.Printf("Connected to replica %d\n", i)
 		readers[i] = bufio.NewReader(servers[i])
 		writers[i] = bufio.NewWriter(servers[i])
 	}
 
 	successful = make([]int, N)
-	latency = make([]int64, *reqsNb / *rounds + *eps)
 	leader := 0
 
 	if *noLeader == false {
@@ -129,31 +128,12 @@ func main() {
 
 	var id int32 = 0
 	done := make(chan bool, N)
-	//args := genericsmrproto.Propose{id, state.Command{state.PUT, 0, [128]int64}, 0}
+	args := genericsmrproto.Propose{id, state.Command{state.PUT, 0, 0}, 0}
 
 	before_total := time.Now()
 
-	if *check {
-		clock := make(chan bool, 1)
-		go func(clockchan chan bool) {
-			time.Sleep(3 * 1000 * 1000 * 1000)
-			clockchan <- true
-		}(clock)
-		go func(n int, clockchan chan bool) {
-			<-clockchan
-			for j := 0; j < n; j++ {
-				if !rsp[j] {
-					isread := 1
-					if put[j] {
-						isread = 0
-					}
-					dlog.Printf("Pending proposal %d, operation %d\n", j, isread)
-				}
-			}
-		}(*reqsNb / *rounds + *eps, clock)
-	}
 	for j := 0; j < *rounds; j++ {
-
+		log.Printf("Round %d\n", j)
 		n := *reqsNb / *rounds
 
 		if *check {
@@ -166,36 +146,31 @@ func main() {
 		if *noLeader {
 			for i := 0; i < N; i++ {
 				go waitReplies(readers, i, perReplicaCount[i], done)
+				log.Printf("End of waiting for replica %d\n", i)
 			}
 		} else {
 			go waitReplies(readers, leader, n, done)
+			log.Printf("End of waiting for replica %d\n", leader)
 		}
 
 		before := time.Now()
 
 		for i := 0; i < n+*eps; i++ {
 			dlog.Printf("Sending proposal %d\n", id)
-			//args.CommandId = id
-			var op state.Operation
+			log.Printf("Sending proposal %d\n", id)
+			args.CommandId = id
 			if put[i] {
-				op = state.PUT
+				args.Command.Op = state.PUT
 			} else {
-				op = state.GET
+				args.Command.Op = state.GET
 			}
-			key := state.Key(karray[i])
-			//var values [128]int64
-			//for index := range values {
-			//	values[index] = int64(i)
-			//}
-			values := state.Value(i)
-			args := genericsmrproto.Propose{id, state.Command{op, key, values}, 0}
-			//args.Command.V = state.Value(i)
+			args.Command.K = state.Key(karray[i])
+			args.Command.V = state.Value(i)
 			//args.Timestamp = time.Now().UnixNano()
 			if !*fast {
 				if *noLeader {
 					leader = rarray[i]
 				}
-				latency[id] -= time.Now().UnixNano()
 				writers[leader].WriteByte(genericsmrproto.PROPOSE)
 				args.Marshal(writers[leader])
 			} else {
@@ -215,6 +190,7 @@ func main() {
 			}
 		}
 		for i := 0; i < N; i++ {
+			log.Printf("Flushing replica %d\n", i)
 			writers[i].Flush()
 		}
 
@@ -227,10 +203,11 @@ func main() {
 		} else {
 			err = <-done
 		}
+		log.Printf("End of round %d (err=%v)\n", j, err)
 
 		after := time.Now()
 
-		fmt.Printf("Round took %v\n", after.Sub(before))
+		fmt.Printf("Round took %v\n", after.Sub(before).Seconds())
 
 		if *check {
 			for j := 0; j < n; j++ {
@@ -253,19 +230,15 @@ func main() {
 	}
 
 	after_total := time.Now()
-	fmt.Printf("Test took %v\n", after_total.Sub(before_total))
+	fmt.Printf("Test took %v\n", after_total.Sub(before_total).Seconds())
 
 	s := 0
 	for _, succ := range successful {
 		s += succ
 	}
-	var l int64 = 0
-	for _, lat := range latency {
-		l += lat / 1000000
-	}
-	l /= int64(s)
+
 	fmt.Printf("Successful: %d\n", s)
-	fmt.Printf("Latency: %d\n", l)
+	log.Printf("Successful: %d\n", s)
 
 	for _, client := range servers {
 		if client != nil {
@@ -277,9 +250,10 @@ func main() {
 
 func waitReplies(readers []*bufio.Reader, leader int, n int, done chan bool) {
 	e := false
-
+	log.Printf("Waiting for %d replies from replica %d\n", n, leader)
 	reply := new(genericsmrproto.ProposeReplyTS)
 	for i := 0; i < n; i++ {
+		log.Printf("Reading reply %d from replica %d\n", i, leader)
 		if err := reply.Unmarshal(readers[leader]); err != nil {
 			fmt.Println("Error when reading:", err)
 			e = true
@@ -293,34 +267,9 @@ func waitReplies(readers []*bufio.Reader, leader int, n int, done chan bool) {
 			rsp[reply.CommandId] = true
 		}
 		if reply.OK != 0 {
+			log.Printf("Reply is not OK\n")
 			successful[leader]++
-			latency[reply.CommandId] += time.Now().UnixNano()
 		}
 	}
 	done <- e
-}
-
-func tpPrinter(done chan bool, clock chan bool) {
-	tp := 0
-	for {
-		select {
-		case <-done:
-			return
-
-		case <-clock:
-			s := 0
-			for _, succ := range successful {
-				s += succ
-			}
-			fmt.Printf("Throughput is %v\n", s-tp)
-			tp = s
-		}
-	}
-}
-
-func tpClock(clock chan bool) {
-	for {
-		time.Sleep(1000 * 1000 * 1000)
-		clock <- true
-	}
 }

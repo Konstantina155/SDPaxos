@@ -10,12 +10,13 @@ writes=$4
 epaxos_enabled=$5
 gomaxprocs=$6
 conflicts=$7
-rounds=$((reqs / 1))
+batch_size=1
+rounds=$((reqs / batch_size))
 
 # fill with master_ip (private)
 for((c = 0; c < $clients; c++))
 do
     filename=logs-$replicas-replicas-$8/$8-S$replicas-C$clients-r$reqs-b$batch_size-c$conflicts--client$c.out
-    ../bin/client -maddr "..." -q $reqs -w $writes -e=$epaxos_enabled -f=$fast_paxos_enabled -r $rounds -p $gomaxprocs -c $conflicts >> $filename &
+    ../bin/client -maddr "..." -q $reqs -w $writes -e=$epaxos_enabled -r $rounds -p $gomaxprocs -c $conflicts >> $filename &
 done
 ./check_process_finished.sh
