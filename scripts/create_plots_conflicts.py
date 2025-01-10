@@ -80,14 +80,14 @@ for request in requests:
                 label=f"{system}/{replica} replicas"
             )
 
-    plt.xticks([0, 5, 25, 50, 75, 100], labels=["0", "5", "25", "50", "75", "100"], fontsize=12)
+    plt.xticks([0, 5, 25, 50, 75, 100], labels=["0", "5", "25", "50", "75", "100"], fontsize=16)
     yticks = np.arange(0, 8000, 1000)
-    plt.yticks(yticks, labels=[f"{int(y/1000)}K" if y != 0 else "0" for y in yticks], fontsize=12)
+    plt.yticks(yticks, labels=[f"{int(y/1000)}K" if y != 0 else "0" for y in yticks], fontsize=16)
 
-    plt.title(f"{request} Requests", fontsize=15)
-    plt.xlabel("Conflict Rate (%)", fontsize=14)
-    plt.ylabel("Throughput (reqs/sec)", fontsize=14)
-    plt.legend(loc="upper right", fontsize=12)
+    plt.title(f"{request} Requests", fontsize=20)
+    plt.xlabel("Conflict Rate (%)", fontsize=18)
+    plt.ylabel("Throughput (reqs/sec)", fontsize=18)
+    plt.legend(loc="upper right", fontsize=14)
     plt.grid(True, linestyle="--", alpha=0.7)
     plt.tight_layout()
-    plt.savefig(f"../plots/Conflicts_{request}_requests.png")
+    plt.savefig(f"../plots/Conflicts_{request}_requests.pdf", format='pdf')

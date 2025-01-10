@@ -44,7 +44,7 @@ for system, file_name in zip(systems, file_names):
 result_df = pd.concat(dfs, ignore_index=True)
 
 custom_palette = sns.color_palette(["#FF5733", "#33FF57", "#3357FF", "#F333FF"])
-plt.figure(figsize=(10, 6))
+plt.figure(figsize=(8, 6))
 unique_requests = sorted(result_df['Requests'].unique())
 bar_width = 0.1
 positions = {
@@ -66,13 +66,13 @@ for idx, system in enumerate(systems):
             label=system if request == unique_requests[0] else ""  # Add legend only once
         )
 
-plt.yticks(fontsize=12)
+plt.yticks(fontsize=18)
 plt.xticks(
     [np.mean(positions[request]) for request in unique_requests],
-    [f"{request} Requests" for request in unique_requests], fontsize=12
+    [f"{request} Requests" for request in unique_requests], fontsize=18
 )
-plt.ylabel("Throughput (reqs/sec)", fontsize=14)
-plt.title("Writes", fontsize=14)
-plt.legend(loc="upper right", fontsize=14)
+plt.ylabel("Throughput (reqs/sec)", fontsize=20)
+plt.title("Writes", fontsize=20)
+plt.legend(loc="upper right", fontsize=20)
 plt.tight_layout()
-plt.savefig('../plots/No_conflicts_all_systems.png')
+plt.savefig('../plots/No_conflicts_all_systems.pdf', format='pdf')
