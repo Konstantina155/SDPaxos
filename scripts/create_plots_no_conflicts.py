@@ -30,6 +30,14 @@ def create_plots(system, output, requests):
     })
     return df
 
+def thousands_formatter(x):
+    if x == 0:
+        return "0"
+    elif x < 1000:
+        return ""
+    else:
+        return f"{int(x / 1000)}K"
+
 systems = ["Multi-Paxos", "Mencius", "EPaxos", "SDPaxos"]
 file_names = ["paxos0", "mencius0", "epaxos0", "sdpaxos0"]
 requests = [5000, 20000]
@@ -66,7 +74,20 @@ for idx, system in enumerate(systems):
             label=system if request == unique_requests[0] else ""  # Add legend only once
         )
 
-plt.yticks(fontsize=18)
+yticks_values = plt.gca().get_yticks()
+formatted_yticks = [thousands_formatter(value) for value in yticks_values]
+previous_value = ""
+for idx, value in enumerate(formatted_yticks):
+    if value == "":
+        continue
+    else:
+        if previous_value == value:
+            formatted_yticks[idx] = ""
+        else:
+            formatted_yticks[idx] = value
+    previous_value = formatted_yticks[idx]
+plt.yticks(yticks_values, formatted_yticks, fontsize=18)
+
 plt.xticks(
     [np.mean(positions[request]) for request in unique_requests],
     [f"{request} Requests" for request in unique_requests], fontsize=18
